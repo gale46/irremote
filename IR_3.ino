@@ -82,10 +82,6 @@ void setup() {
 
 }
 
-
-
-
-
 void clear(){
   for (int i = 0 ; i < EEPROM.length() ; i++) {
     EEPROM.write(i, 0);
@@ -97,7 +93,7 @@ void clear(){
  */
 void send_ir_data(int i) {
     IRCode irCodes;
-    int address = EEPROM_BASE_ADDRESS + i * sizeof(irCodes)*10;
+    int address = EEPROM_BASE_ADDRESS + i * 4;
     EEPROM.get(address , irCodes);
     digitalWrite(LED_SEN, HIGH);
     delay(100);
@@ -107,12 +103,10 @@ void send_ir_data(int i) {
     Serial.print(irCodes.command, HEX);
     Serial.println(irCodes.repeats, HEX);
     IrSender.sendNEC(irCodes.address, irCodes.command, irCodes.repeats++);
-
     Serial.print("EEPROM address to store: ");
     Serial.println(address);
     Serial.print("EEPROM address of size: ");
     Serial.println(sizeof(irCodes));
-
     Serial.flush(); 
   
 
@@ -121,12 +115,14 @@ void send_ir_data(int i) {
 void receive_ir_data() {
   Serial.println(IrReceiver.decode());
   if (IrReceiver.decode()) {
+    numIRCodes++;
     lastReceiveTime = millis();
     digitalWrite(LED_REC, HIGH);
     delay(100);
     digitalWrite(LED_REC, LOW);
     bool turn = true; 
     //檢查是否有重複
+    /*
     for(int i = 0;i <= numIRCodes;i++){
       if(irCodes[i].command == IrReceiver.decodedIRData.command){
         Serial.print(F("decoded command EXIST: "));
@@ -135,7 +131,10 @@ void receive_ir_data() {
         break;
       }
     }
-    if(numIRCodes <= numMaxIRCodes && turn == true){
+
+     && turn == true
+    */
+    if(numIRCodes <= numMaxIRCodes){
       irCodes[numIRCodes].address = IrReceiver.decodedIRData.address;
       irCodes[numIRCodes].command = IrReceiver.decodedIRData.command;
       irCodes[numIRCodes].repeats = 1;
@@ -151,17 +150,22 @@ void receive_ir_data() {
       Serial.print(numIRCodes);
       Serial.print(": ");
       Serial.println(irCodes[numIRCodes].repeats, HEX);
-      numIRCodes++;
-      int address = EEPROM_BASE_ADDRESS + numIRCodes * sizeof(irCodes);
-      EEPROM.put(address, irCodes);//存到eeprom指定位置
+      
+
+
+      // 计算存储该数据的EEPROM地址
+      int address = EEPROM_BASE_ADDRESS + numIRCodes * 4; 
+
+      // 将数据存储到EEPROM中
+      EEPROM.put(address, irCodes[numIRCodes]);
+
+      // int address = EEPROM_BASE_ADDRESS + numIRCodes * sizeof(irCodes);
+      // EEPROM.put(address, irCodes);//存到eeprom指定位置
       EEPROM.write(0, numIRCodes);//0存放ircode的numIRCode個數
       Serial.print("EEPROM address to store: ");
       Serial.println(address);
-      Serial.print("EEPROM address of size: ");
-      Serial.println(sizeof(irCodes));
-      Serial.println(numIRCodes);
-      // EEPROM.commit();
-      send_ir_data(numIRCodes);
+    }else{
+      Serial.println("over");
     }
     IrReceiver.resume();// Clear the decode buffer
     
@@ -215,8 +219,5 @@ void loop() {
       default:
         break;
     }
-  // Serial.print("loop: ");
-  // Serial.println(count);
-  // count++;
   Serial.flush();
 }
